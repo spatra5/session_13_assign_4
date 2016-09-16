@@ -53,11 +53,14 @@
 			myapp.controller("MainController", function($scope, $location, OrderDetailService) {
 				
 				$scope.orders = OrderDetailService.getOrders();
+				$scope.items = OrderDetailService.getItems();
+				
 				$scope.cartItems = [];
 				$scope.newItem = {};
 				
 				$scope.addOrderItem = function(isValid) {
 					if (isValid) {
+						
 						$scope.cartItems.push($scope.newItem);
 						$scope.newItem = {};
 						alert('Item added to cart!');
@@ -69,14 +72,18 @@
 					$scope.cartItems.splice(itemno,1);
 				};
 				
+				$scope.getItem = function(itemid) {
+					return OrderDetailService.getItem(itemid);
+				};
+				
 				$scope.modifyOrders = function() { 
 					$scope.orders = OrderDetailService.addOrder($scope.cartItems);
 					$scope.cartItems = [];
 					$location.path('/vieworders');
 				};
 			});
-			
-			myapp.service("OrderDetailService", function(){
+
+			myapp.service("OrderDetailService", function() {
 				
 				var orderid = 1; // private var
 				var orders = [
@@ -85,27 +92,18 @@
 						date : '1288323623006',
 						items : [
 							{
-								desc: 'Samsung mobile',
+								id: 'item01',
 								qty : '1'
 							},
 							{
-								desc: 'Titan Watch',
+								id: 'item03',
 								qty : '1'
 							}
-						]
-					},
-					{	
-						orderid : 'Order#' + orderid++, 
-						date : '1284523623006',
-						items : [
-							{
-								desc: 'Samsung laptop',
-								qty : '1'
-							}
-						]
+						],
+						amount : 9350.98
 					}
 				];
-				
+
 				this.getOrders = function(){
 					return orders;
 				};
@@ -115,10 +113,57 @@
 					newOrder.orderid = 'Order#' + orderid++;
 					newOrder.date = new Date();
 					newOrder.items = items;
+					newOrder.amount = this.calculateBill(newOrder.items);
 					orders.push(newOrder);
 					return orders;
 				};
-
+				
+				this.calculateBill = function(items) {
+					var total_amount = 0;
+					for(item in  items) {
+						var selItem = this.getItem(items[item].id);
+						total_amount+= selItem.price * items[item].qty;
+					}
+					return total_amount;
+				};
+				
+				var items = [
+					{
+						id : 'item01',
+						desc : 'Samsung mobile',
+						price : 9000.98,
+						make : 'Samsung',
+						model : 'S7'
+					},
+					{
+						id : 'item02',
+						desc : 'Titan watch',
+						price : 6099.57,
+						make : 'Titan',
+						model : 'Smart'
+					},
+					{
+						id : 'item03',
+						desc : 'Lakme kajal',
+						price : 350.00,
+						make : 'Lakme',
+						model : 'Collosal'
+					}
+				];
+				
+				this.getItems = function(){
+					return items;
+				};
+				
+				this.getItem = function(id){
+					// find and return an existing item with the given id
+					for (i in items) {
+						if(items[i].id == id){
+							return items[i];
+						}
+					}
+				};
+				
 			});
 		</script>
 	</head>
@@ -187,17 +232,19 @@
 						<th>Order Id:</th>
 						<th>Details:</th>
 						<th>Date:</th>
+						<th>Amount:</th>
 					</thead>
 					<tbody>
 						<tr ng-repeat="order in orders">
 							<td>{{order.orderid}}</td>
 							<td>
-								<div ng-repeat="item in order.items">
+								<div ng-repeat="oitem in order.items" ng-init="item=getItem(oitem.id)">
 									<h4>Item {{$index + 1}}:</h4>
-									<p><strong>Name:</strong> {{item.desc}} <strong>Quantity:</strong> {{item.qty}}</p>
+									<p><strong>Name:</strong> {{item.desc}} <strong>Quantity:</strong> {{oitem.qty}}</p>
 								</div>
 							</td>
 							<td>{{order.date | date:'MM/dd/yyyy @ h:mma'}}</td>
+							<td>{{order.amount | currency: 'INR '}}</td>
 						</tr>
 					</tbody>
 				</table>
@@ -207,10 +254,13 @@
 		<script type = "text/ng-template" id = "viewcart.htm">			
 			<h3>View/Update cart: </h3>
 			<form name="cartForm" class="well col-md-6" ng-submit="addOrderItem(cartForm.$valid)">
-				Item: <input type="text" placeholder="Enter item description" class="form-control" required name="desc" ng-model="newItem.desc" /> 
-				<p ng-show="cartForm.desc.$invalid && !cartForm.desc.$pristine" class="help-block">Item description is required.</p>
+				Item: <select class="form-control" ng-model="newItem.id" ng-options="item.id as item.desc for item in items" required name="selectedItem">
+				</select>
+				<p ng-show="cartForm.selectedItem.$invalid && !cartForm.selectedItem.$pristine" class="help-block">Please select an item.</p>
+				<!--Item: <input type="text" placeholder="Enter item description" class="form-control" required name="desc" ng-model="newItem.desc" />
+				<p ng-show="cartForm.desc.$invalid && !cartForm.desc.$pristine" class="help-block">Item description is required.</p> -->
 				</br/>
-				Qantity:<select class="form-control" ng-model="newItem.qty" name="quantity" required>
+				Quantity: <select class="form-control" ng-model="newItem.qty" name="quantity" required>
 					<option>1</option>
 					<option>2</option>
 					<option>3</option>
@@ -229,15 +279,17 @@
 									<thead>
 										<th>Item no:</th>
 										<th>Description:</th>
+										<th>Price:</th>
 										<th>Quantity</th>
 										<th>Remove</th>
 									</thead>
 									<tbody>
 										<tr ng-hide="cartItems.length"><td colspan="4">The cart is empty</td></tr>
-										<tr ng-repeat="item in cartItems">
+										<tr ng-repeat="citem in cartItems" ng-init="item=getItem(citem.id)">
 											<td>{{$index + 1}}</td>
-											<td>{{item.desc}}</td>
-											<td>{{item.qty}}</td>
+											<td><strong>{{item.desc}}</strong></td>
+											<td>{{item.price}}</td>
+											<td>{{citem.qty}}</td>
 											<td><button class="btn btn-danger btn-sm" ng-click="removeItem($index)"><span class="glyphicon glyphicon-remove"></span></button></td>
 										</tr>
 									</tbody>
